@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import type { Config, GridItem, ThemeMode } from '../types';
+import type { Config, ExpertItem, GridItem, ThemeMode } from '../types';
 import GridView from './GridView.vue';
 import { applyThemeMode, saveConfig } from '../utils/config';
 
@@ -9,16 +9,16 @@ const props = defineProps<{
 }>();
 
 const popupConfig = ref<Config>(JSON.parse(JSON.stringify(props.config)));
-const currentGrid = ref<GridItem[]>(props.config.items);
 const currentPath = ref<number[]>([]);
-const isSubGrid = ref(false);
 const searchQuery = ref('');
 const inputRef = ref<HTMLInputElement | null>(null);
 
 interface SearchResultItem {
-  item: GridItem;
+  id: string;
+  label: string;
+  url: string;
+  code: string;
   path: string[];
-  index: number;
 }
 
 interface PopupCommand {
@@ -37,16 +37,28 @@ const themeModeLabels: Record<ThemeMode, string> = {
 
 watch(() => props.config, (newConfig) => {
   popupConfig.value = JSON.parse(JSON.stringify(newConfig));
-  if (newConfig.mode === 'simple') {
-    currentGrid.value = newConfig.items;
-    currentPath.value = [];
-    isSubGrid.value = false;
-  }
+  currentPath.value = [];
 }, { deep: true });
 
 onMounted(() => {
   inputRef.value?.focus();
 });
+
+function resolveGridAtPath(items: GridItem[], path: number[]): GridItem[] {
+  let current = items;
+  for (const idx of path) {
+    const target = current[idx];
+    if (target?.type === 'grid' && target.grid) {
+      current = target.grid;
+    } else {
+      return items;
+    }
+  }
+  return current;
+}
+
+const currentGrid = computed(() => resolveGridAtPath(popupConfig.value.items, currentPath.value));
+const isSubGrid = computed(() => currentPath.value.length > 0);
 
 const breadcrumbs = computed(() => {
   const paths: string[] = [];
@@ -68,9 +80,11 @@ function flattenGrid(items: GridItem[], path: string[] = [], startIndex = 1): Se
     const currentPath = [...path, item.label || `网站${index + 1}`];
     if (item.type === 'url' && item.url) {
       result.push({
-        item,
+        id: item.id,
+        label: item.label || `网站${nextIndex}`,
+        url: item.url,
+        code: String(nextIndex),
         path: currentPath,
-        index: nextIndex
       });
       nextIndex += 1;
     } else if (item.type === 'grid' && item.grid) {
@@ -83,7 +97,23 @@ function flattenGrid(items: GridItem[], path: string[] = [], startIndex = 1): Se
   return result;
 }
 
-const allItems = computed(() => flattenGrid(popupConfig.value.items));
+function flattenExpertItems(items: ExpertItem[]): SearchResultItem[] {
+  return items
+    .filter(item => item.url)
+    .map(item => ({
+      id: item.id,
+      label: item.label,
+      url: item.url,
+      code: item.code,
+      path: [item.label]
+    }));
+}
+
+const allItems = computed(() =>
+  popupConfig.value.mode === 'expert'
+    ? flattenExpertItems(popupConfig.value.expertItems)
+    : flattenGrid(popupConfig.value.items)
+);
 
 const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase());
 const isCommandQuery = computed(() => normalizedQuery.value.startsWith('/'));
@@ -97,8 +127,6 @@ function handleItemClick(item: GridItem, index: number) {
   } else if (item.type === 'grid' && item.grid) {
     // 进入子网格
     currentPath.value.push(index);
-    currentGrid.value = item.grid;
-    isSubGrid.value = true;
   }
 }
 
@@ -106,26 +134,10 @@ function goBack() {
   if (currentPath.value.length === 0) return;
 
   currentPath.value.pop();
-
-  if (currentPath.value.length === 0) {
-    currentGrid.value = popupConfig.value.items;
-    isSubGrid.value = false;
-  } else {
-    // 重新计算当前网格
-    let current = popupConfig.value.items;
-    for (const idx of currentPath.value) {
-      if (current[idx].type === 'grid' && current[idx].grid) {
-        current = current[idx].grid;
-      }
-    }
-    currentGrid.value = current;
-  }
 }
 
 function goHome() {
   currentPath.value = [];
-  currentGrid.value = popupConfig.value.items;
-  isSubGrid.value = false;
 }
 
 function openSettings() {
@@ -202,10 +214,10 @@ const matchedCommands = computed(() => {
 const matchedItems = computed(() => {
   if (isCommandQuery.value || !normalizedQuery.value) return [];
   return allItems.value.filter(match => {
-    if (/^\d+$/.test(normalizedQuery.value)) {
-      return match.index === Number(normalizedQuery.value);
+    if (match.code.toLowerCase() === normalizedQuery.value) {
+      return true;
     }
-    return match.item.label.toLowerCase().includes(normalizedQuery.value);
+    return match.label.toLowerCase().includes(normalizedQuery.value);
   }).slice(0, 9);
 });
 
@@ -223,13 +235,19 @@ function jumpToUrl(url: string) {
 }
 
 async function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'ArrowLeft' && popupConfig.value.mode === 'simple' && isSubGrid.value && !hasSearchInput.value) {
+    e.preventDefault();
+    goBack();
+    return;
+  }
+
   if (e.key === 'Enter') {
     if (isCommandQuery.value && matchedCommands.value.length > 0) {
       await executeCommand(matchedCommands.value[0]);
       return;
     }
     if (matchedItems.value.length > 0) {
-      jumpToUrl(matchedItems.value[0].item.url || '');
+      jumpToUrl(matchedItems.value[0].url || '');
     }
     return;
   }
@@ -255,6 +273,20 @@ async function handleKeydown(e: KeyboardEvent) {
         placeholder="搜索网址，或输入 /D /L /W /S /A"
         class="form-input px-4 py-3 text-sm shadow-lg"
       />
+    </div>
+
+    <div
+      v-if="popupConfig.mode === 'simple' && isSubGrid && !hasSearchInput"
+      class="mb-3 flex items-center justify-between gap-3"
+    >
+      <div class="text-muted text-xs">按【方向左】返回上一层级</div>
+      <button
+        type="button"
+        @click="goBack"
+        class="toolbar-button px-3 py-1.5 text-xs"
+      >
+        ←返回
+      </button>
     </div>
 
     <!-- 面包屑导航 -->
@@ -300,16 +332,16 @@ async function handleKeydown(e: KeyboardEvent) {
     <div v-else-if="matchedItems.length > 0" class="space-y-2">
       <button
         v-for="match in matchedItems"
-        :key="`${match.index}-${match.item.id}`"
+        :key="`${match.code}-${match.id}`"
         type="button"
-        @click="jumpToUrl(match.item.url || '')"
+        @click="jumpToUrl(match.url || '')"
         class="search-result flex w-full items-center gap-3 p-3 text-left transition-all duration-200"
       >
         <div class="badge h-9 w-9 shrink-0 text-sm font-semibold">
-          {{ match.index }}
+          {{ match.code }}
         </div>
         <div class="min-w-0 flex-1">
-          <div class="text-theme truncate text-sm font-medium">{{ match.item.label }}</div>
+          <div class="text-theme truncate text-sm font-medium">{{ match.label }}</div>
           <div class="text-muted truncate text-xs">{{ match.path.join(' > ') }}</div>
         </div>
       </button>

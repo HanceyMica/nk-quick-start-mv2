@@ -1,5 +1,5 @@
-import type { Config, ThemeMode } from '../types';
-import { createDefaultConfig } from '../types';
+import type { Config, ExpertItem, GridItem, ThemeMode } from '../types';
+import { createDefaultConfig, generateId } from '../types';
 
 interface StorageResult {
   config?: Config;
@@ -11,13 +11,46 @@ function isThemeMode(value: unknown): value is ThemeMode {
   return value === 'light' || value === 'dark' || value === 'system';
 }
 
+function flattenGridToExpertItems(items: GridItem[], startIndex = 1): ExpertItem[] {
+  const result: ExpertItem[] = [];
+  let nextIndex = startIndex;
+
+  items.forEach((item) => {
+    if (item.type === 'url' && item.url) {
+      result.push({
+        id: item.id || generateId(),
+        code: String(nextIndex),
+        label: item.label || `网址${nextIndex}`,
+        url: item.url
+      });
+      nextIndex += 1;
+    } else if (item.type === 'grid' && item.grid) {
+      const childItems = flattenGridToExpertItems(item.grid, nextIndex);
+      result.push(...childItems);
+      nextIndex += childItems.length;
+    }
+  });
+
+  return result;
+}
+
 function normalizeConfig(config: Config): Config {
   const defaults = createDefaultConfig();
+  const normalizedExpertItems = (config.expertItems?.length ? config.expertItems : flattenGridToExpertItems(config.items ?? defaults.items))
+    .map((item, index) => ({
+      id: item.id || generateId(),
+      code: String(item.code || index + 1).trim(),
+      label: item.label || `网址${index + 1}`,
+      url: item.url || ''
+    }))
+    .filter(item => item.code);
+
   return {
     ...defaults,
     ...config,
     themeMode: isThemeMode(config.themeMode) ? config.themeMode : defaults.themeMode,
-    items: config.items?.length ? config.items : defaults.items
+    items: config.items?.length ? config.items : defaults.items,
+    expertItems: normalizedExpertItems.length ? normalizedExpertItems : defaults.expertItems
   };
 }
 

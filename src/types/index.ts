@@ -6,6 +6,13 @@ export interface GridItem {
   grid?: GridItem[];
 }
 
+export interface ExpertItem {
+  id: string;
+  code: string;
+  label: string;
+  url: string;
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface Config {
@@ -14,6 +21,7 @@ export interface Config {
   expertShortcut: string;
   themeMode: ThemeMode;
   items: GridItem[];
+  expertItems: ExpertItem[];
 }
 
 export function generateId(): string {
@@ -25,6 +33,15 @@ export function createDefaultGridItem(index: number): GridItem {
     id: generateId(),
     label: `网站${index + 1}`,
     type: 'url',
+    url: ''
+  };
+}
+
+export function createDefaultExpertItem(index: number): ExpertItem {
+  return {
+    id: generateId(),
+    code: String(index + 1),
+    label: `网址${index + 1}`,
     url: ''
   };
 }
@@ -43,7 +60,7 @@ export function createDefaultConfig(): Config {
   ];
 
   return {
-    version: 2,
+    version: 3,
     mode: 'simple',
     expertShortcut: 'Alt+9',
     themeMode: 'system',
@@ -51,6 +68,12 @@ export function createDefaultConfig(): Config {
       id: generateId(),
       label: item.label,
       type: 'url' as const,
+      url: item.url
+    })),
+    expertItems: defaultUrls.map((item, index) => ({
+      id: generateId(),
+      code: String(index + 1),
+      label: item.label,
       url: item.url
     }))
   };

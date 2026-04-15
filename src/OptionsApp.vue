@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import SettingsForm from './components/SettingsForm.vue';
@@ -10,6 +10,7 @@ const loading = ref(true);
 const showToast = ref(false);
 const toastMessage = ref('');
 let stopWatchingSystemTheme: (() => void) | undefined;
+let removeStorageListener: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -24,7 +25,7 @@ async function loadConfig() {
 async function handleSave(newConfig: Config) {
   try {
     await saveConfig(newConfig);
-    config.value = newConfig;
+    config.value = await ensureConfig();
     showToastMessage('保存成功');
   } catch (e) {
     console.error('保存失败:', e);
@@ -42,6 +43,22 @@ function showToastMessage(message: string, _success = true) {
 
 onMounted(() => {
   loadConfig();
+
+  const handleStorageChanged = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ) => {
+    if (areaName === 'sync' && changes.config?.newValue) {
+      config.value = changes.config.newValue as Config;
+    }
+  };
+
+  chrome.storage.onChanged.addListener(handleStorageChanged);
+  removeStorageListener = () => chrome.storage.onChanged.removeListener(handleStorageChanged);
+});
+
+onUnmounted(() => {
+  removeStorageListener?.();
 });
 
 watch(

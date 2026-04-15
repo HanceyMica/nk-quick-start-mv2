@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import PopupView from './components/PopupView.vue';
@@ -8,6 +8,7 @@ import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
 const config = ref<Config>(createDefaultConfig());
 const loading = ref(true);
 let stopWatchingSystemTheme: (() => void) | undefined;
+let removeStorageListener: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -21,6 +22,22 @@ async function loadConfig() {
 
 onMounted(() => {
   loadConfig();
+
+  const handleStorageChanged = (
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string
+  ) => {
+    if (areaName === 'sync' && changes.config?.newValue) {
+      config.value = changes.config.newValue as Config;
+    }
+  };
+
+  chrome.storage.onChanged.addListener(handleStorageChanged);
+  removeStorageListener = () => chrome.storage.onChanged.removeListener(handleStorageChanged);
+});
+
+onUnmounted(() => {
+  removeStorageListener?.();
 });
 
 watch(

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Config, ThemeMode } from '../types';
-import { createDefaultConfig, createEmptyGrid } from '../types';
+import { createDefaultConfig, createDefaultExpertItem, createEmptyGrid } from '../types';
 
 const props = defineProps<{
   config: Config;
@@ -30,8 +30,8 @@ const themeOptions: Array<{ value: ThemeMode; label: string; description: string
 ];
 
 const modeOptions: Array<{ value: Config['mode']; label: string; description: string }> = [
-  { value: 'simple', label: '简单模式', description: '弹窗显示九宫格，并保留设置、关于和明暗切换入口' },
-  { value: 'expert', label: '专家模式', description: '弹窗隐藏九宫格，仅保留设置、关于和明暗切换入口' }
+  { value: 'simple', label: '简单模式', description: '弹窗显示九宫格、套娃子网格和底部快捷操作按钮' },
+  { value: 'expert', label: '专家模式', description: '弹窗隐藏九宫格，改为扁平化网址搜索与跳转' }
 ];
 
 function updateItem(index: number, field: 'label' | 'url', value: string) {
@@ -69,14 +69,26 @@ function updateSubItem(parentIndex: number, subIndex: number, field: 'label' | '
   }
 }
 
+function updateExpertItem(index: number, field: 'code' | 'label' | 'url', value: string) {
+  (localConfig.value.expertItems[index] as any)[field] = value;
+}
+
+function addExpertItem() {
+  localConfig.value.expertItems.push(createDefaultExpertItem(localConfig.value.expertItems.length));
+}
+
+function removeExpertItem(index: number) {
+  localConfig.value.expertItems.splice(index, 1);
+}
+
 function save() {
-  emit('save', localConfig.value);
+  emit('save', JSON.parse(JSON.stringify(localConfig.value)) as Config);
 }
 
 function reset() {
   const defaultConfig = createDefaultConfig();
   localConfig.value = defaultConfig;
-  emit('save', defaultConfig);
+  emit('save', JSON.parse(JSON.stringify(defaultConfig)) as Config);
 }
 
 function exportConfig() {
@@ -99,9 +111,15 @@ function importConfig() {
     if (!file) return;
     const text = await file.text();
     try {
-      const config = JSON.parse(text) as Config;
-      localConfig.value = config;
-      emit('save', config);
+      const importedConfig = JSON.parse(text) as Partial<Config>;
+      const normalizedConfig: Config = {
+        ...createDefaultConfig(),
+        ...importedConfig,
+        items: importedConfig.items?.length ? importedConfig.items : createDefaultConfig().items,
+        expertItems: importedConfig.expertItems?.length ? importedConfig.expertItems : createDefaultConfig().expertItems
+      };
+      localConfig.value = normalizedConfig;
+      emit('save', normalizedConfig);
     } catch {
       alert('导入失败，文件格式不正确');
     }
@@ -154,6 +172,64 @@ function importConfig() {
       </div>
     </div>
 
+    <div v-if="localConfig.mode === 'expert'" class="panel space-y-4 p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-theme text-xl font-semibold">专家模式网址列表</h2>
+          <p class="text-muted mt-1 text-sm">专家模式使用扁平化列表存储，支持自定义编号且不限数量。</p>
+        </div>
+        <button
+          type="button"
+          class="secondary-button px-4 py-2 text-sm"
+          @click="addExpertItem"
+        >
+          新增网址
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div
+          v-for="(expertItem, index) in localConfig.expertItems"
+          :key="expertItem.id"
+          class="surface-soft rounded-xl p-4"
+        >
+          <div class="mb-3 flex items-center justify-between">
+            <div class="text-secondary text-sm font-medium">条目 {{ index + 1 }}</div>
+            <button
+              type="button"
+              class="text-muted text-sm hover:opacity-75"
+              @click="removeExpertItem(index)"
+            >
+              删除
+            </button>
+          </div>
+          <div class="grid gap-3 md:grid-cols-[120px_minmax(0,1fr)_minmax(0,1.4fr)]">
+            <input
+              type="text"
+              :value="expertItem.code"
+              @input="updateExpertItem(index, 'code', ($event.target as HTMLInputElement).value)"
+              placeholder="编号"
+              class="form-input"
+            />
+            <input
+              type="text"
+              :value="expertItem.label"
+              @input="updateExpertItem(index, 'label', ($event.target as HTMLInputElement).value)"
+              placeholder="网址名称"
+              class="form-input"
+            />
+            <input
+              type="url"
+              :value="expertItem.url"
+              @input="updateExpertItem(index, 'url', ($event.target as HTMLInputElement).value)"
+              placeholder="https://example.com"
+              class="form-input"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel space-y-4 p-6">
       <div>
         <h2 class="text-theme text-xl font-semibold">主题模式</h2>
@@ -175,7 +251,7 @@ function importConfig() {
     </div>
 
     <!-- 主网格配置 -->
-    <div class="panel p-6">
+    <div v-if="localConfig.mode === 'simple'" class="panel p-6">
       <h2 class="text-theme mb-4 text-xl font-semibold">主网格配置</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
@@ -228,35 +304,37 @@ function importConfig() {
     </div>
 
     <!-- 套娃格子子网格配置 -->
-    <div
-      v-for="({ item, index: parentIndex }) in gridItemsWithIndex"
-      :key="item.id"
-      class="panel p-6"
-    >
-      <h3 class="text-theme mb-4 text-lg font-semibold">子网格: {{ item.label || `格子${parentIndex + 1}` }}</h3>
-      <div class="grid grid-cols-3 gap-3">
-        <div
-          v-for="(subItem, subIndex) in item.grid"
-          :key="subItem.id"
-          class="surface-soft rounded-lg p-2"
-        >
-          <input
-            type="text"
-            :value="subItem.label"
-            @input="updateSubItem(parentIndex, subIndex, 'label', ($event.target as HTMLInputElement).value)"
-            placeholder="名称"
-            class="form-input mb-1 text-xs"
-          />
-          <input
-            type="url"
-            :value="subItem.url"
-            @input="updateSubItem(parentIndex, subIndex, 'url', ($event.target as HTMLInputElement).value)"
-            placeholder="网址"
-            class="form-input text-xs"
-          />
+    <template v-if="localConfig.mode === 'simple'">
+      <div
+        v-for="({ item, index: parentIndex }) in gridItemsWithIndex"
+        :key="item.id"
+        class="panel p-6"
+      >
+        <h3 class="text-theme mb-4 text-lg font-semibold">子网格: {{ item.label || `格子${parentIndex + 1}` }}</h3>
+        <div class="grid grid-cols-3 gap-3">
+          <div
+            v-for="(subItem, subIndex) in item.grid"
+            :key="subItem.id"
+            class="surface-soft rounded-lg p-2"
+          >
+            <input
+              type="text"
+              :value="subItem.label"
+              @input="updateSubItem(parentIndex, subIndex, 'label', ($event.target as HTMLInputElement).value)"
+              placeholder="名称"
+              class="form-input mb-1 text-xs"
+            />
+            <input
+              type="url"
+              :value="subItem.url"
+              @input="updateSubItem(parentIndex, subIndex, 'url', ($event.target as HTMLInputElement).value)"
+              placeholder="网址"
+              class="form-input text-xs"
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- 操作按钮 -->
     <div class="flex flex-wrap gap-4 justify-center">

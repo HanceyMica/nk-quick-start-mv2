@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import type { Config, GridItem } from './types';
+import type { Config, ExpertItem } from './types';
 import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
 
 const config = ref<Config | null>(null);
 const searchQuery = ref('');
-const matchedItems = ref<Array<{ item: GridItem; path: string[]; index: number }>>([]);
+const matchedItems = ref<ExpertItem[]>([]);
 const inputRef = ref<HTMLInputElement | null>(null);
 let stopWatchingSystemTheme: (() => void) | undefined;
-
-interface MatchedItem {
-  item: GridItem;
-  path: string[];
-  index: number;
-}
 
 async function loadConfig() {
   try {
@@ -23,32 +17,9 @@ async function loadConfig() {
   }
 }
 
-function flattenGrid(items: GridItem[], path: string[] = [], startIndex = 1): MatchedItem[] {
-  const result: MatchedItem[] = [];
-  let nextIndex = startIndex;
-
-  items.forEach((item, index) => {
-    const currentPath = [...path, item.label || `网站${index + 1}`];
-    if (item.type === 'url' && item.url) {
-      result.push({
-        item,
-        path: currentPath,
-        index: nextIndex
-      });
-      nextIndex += 1;
-    } else if (item.type === 'grid' && item.grid) {
-      // 递归时把当前累计编号传下去，保证整棵树的编号连续且唯一。
-      const childItems = flattenGrid(item.grid, currentPath, nextIndex);
-      result.push(...childItems);
-      nextIndex += childItems.length;
-    }
-  });
-  return result;
-}
-
 const allItems = computed(() => {
   if (!config.value) return [];
-  return flattenGrid(config.value.items);
+  return config.value.expertItems.filter(item => item.url);
 });
 
 function search() {
@@ -60,12 +31,10 @@ function search() {
 
   // 匹配逻辑：编号精确匹配，名称模糊匹配
   matchedItems.value = allItems.value.filter(m => {
-    // 尝试匹配编号
-    if (/^\d+$/.test(query)) {
-      return m.index === parseInt(query);
+    if (m.code.toLowerCase() === query) {
+      return true;
     }
-    // 尝试匹配名称（模糊匹配）
-    return m.item.label.toLowerCase().includes(query);
+    return m.label.toLowerCase().includes(query);
   }).slice(0, 9); // 最多显示9个结果
 }
 
@@ -78,7 +47,7 @@ function jumpToUrl(url: string) {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && matchedItems.value.length > 0) {
-    jumpToUrl(matchedItems.value[0].item.url || '');
+    jumpToUrl(matchedItems.value[0].url || '');
   } else if (e.key === 'Escape') {
     window.close();
   }
@@ -112,7 +81,7 @@ watch(
           @input="search"
           @keydown="handleKeydown"
           type="text"
-          placeholder="输入编号(1-9)或名称(可模糊)后回车跳转"
+          placeholder="输入自定义编号或名称后回车跳转"
           class="form-input px-5 py-4 text-lg shadow-lg"
         />
       </div>
@@ -122,15 +91,15 @@ watch(
         <div
           v-for="(match, idx) in matchedItems"
           :key="idx"
-          @click="jumpToUrl(match.item.url || '')"
+          @click="jumpToUrl(match.url || '')"
           class="search-result flex cursor-pointer items-center gap-4 p-4 transition-all duration-200"
         >
           <div class="badge h-10 w-10 font-bold">
-            {{ match.index }}
+            {{ match.code }}
           </div>
           <div class="flex-1">
-            <div class="text-theme font-medium">{{ match.item.label }}</div>
-            <div class="text-muted text-xs">{{ match.path.join(' > ') }}</div>
+            <div class="text-theme font-medium">{{ match.label }}</div>
+            <div class="text-muted text-xs">{{ match.url }}</div>
           </div>
         </div>
       </div>
@@ -142,7 +111,7 @@ watch(
 
       <!-- 使用说明 -->
       <div v-else class="text-muted text-center text-sm">
-        <p>输入编号或名称快速跳转</p>
+        <p>输入自定义编号或名称快速跳转</p>
         <p class="mt-2">按 ESC 关闭</p>
       </div>
     </div>
