@@ -20,6 +20,7 @@ watch(() => props.config, (newConfig) => {
 const gridItemsWithIndex = computed(() =>
   localConfig.value.items
     .map((item, index) => ({ item, index }))
+    // 套娃配置区需要拿到主数组里的原始索引，不能直接使用过滤后的 v-for 下标。
     .filter(({ item }) => item.type === 'grid')
 );
 
@@ -82,6 +83,7 @@ function removeExpertItem(index: number) {
 }
 
 function save() {
+  // 发出纯对象快照，避免把响应式引用直接传给外层导致保存值和显示值串联。
   emit('save', JSON.parse(JSON.stringify(localConfig.value)) as Config);
 }
 
@@ -112,6 +114,7 @@ function importConfig() {
     const text = await file.text();
     try {
       const importedConfig = JSON.parse(text) as Partial<Config>;
+      // 兼容旧版导入文件：缺失字段时回填默认结构，避免配置页空白或保存报错。
       const normalizedConfig: Config = {
         ...createDefaultConfig(),
         ...importedConfig,

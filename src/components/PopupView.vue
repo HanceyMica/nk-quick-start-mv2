@@ -109,6 +109,7 @@ function flattenExpertItems(items: ExpertItem[]): SearchResultItem[] {
     }));
 }
 
+// simple 模式搜索九宫格链路，expert 模式搜索独立扁平列表，两种模式共用同一套展示逻辑。
 const allItems = computed(() =>
   popupConfig.value.mode === 'expert'
     ? flattenExpertItems(popupConfig.value.expertItems)
@@ -223,6 +224,7 @@ const matchedItems = computed(() => {
 
 async function executeCommand(command: PopupCommand) {
   await command.run();
+  // 主题切换命令执行后清空输入，方便用户立刻看到模式变化。
   if (command.id === 'dark' || command.id === 'light' || command.id === 'system') {
     searchQuery.value = '';
   }

@@ -25,6 +25,7 @@ async function loadConfig() {
 async function handleSave(newConfig: Config) {
   try {
     await saveConfig(newConfig);
+    // 保存后立刻回读一次 storage，避免界面还停留在未归一化的临时对象上。
     config.value = await ensureConfig();
     showToastMessage('保存成功');
   } catch (e) {
@@ -44,6 +45,7 @@ function showToastMessage(message: string, _success = true) {
 onMounted(() => {
   loadConfig();
 
+  // 配置页和 popup 共用同一份 sync 配置，其他页面保存后这里也要实时刷新。
   const handleStorageChanged = (
     changes: Record<string, chrome.storage.StorageChange>,
     areaName: string

@@ -11,6 +11,7 @@ function isThemeMode(value: unknown): value is ThemeMode {
   return value === 'light' || value === 'dark' || value === 'system';
 }
 
+// 旧版本专家模式复用了九宫格数据，这里把旧结构平铺成新的 expertItems 结构。
 function flattenGridToExpertItems(items: GridItem[], startIndex = 1): ExpertItem[] {
   const result: ExpertItem[] = [];
   let nextIndex = startIndex;
@@ -34,6 +35,7 @@ function flattenGridToExpertItems(items: GridItem[], startIndex = 1): ExpertItem
   return result;
 }
 
+// 统一在读取和写入时做一次配置归一化，避免旧配置或缺字段配置把界面打坏。
 function normalizeConfig(config: Config): Config {
   const defaults = createDefaultConfig();
   const normalizedExpertItems = (config.expertItems?.length ? config.expertItems : flattenGridToExpertItems(config.items ?? defaults.items))
@@ -58,6 +60,7 @@ export async function ensureConfig(): Promise<Config> {
   const result = await chrome.storage.sync.get(['config']) as StorageResult;
   if (result.config) {
     const normalizedConfig = normalizeConfig(result.config);
+    // 如果读到的是旧结构或缺省字段，顺手回写一次，后续页面都走统一结构。
     if (JSON.stringify(normalizedConfig) !== JSON.stringify(result.config)) {
       await chrome.storage.sync.set({ config: normalizedConfig });
     }
@@ -91,6 +94,7 @@ export function applyThemeMode(themeMode: ThemeMode) {
 export function watchSystemTheme(themeMode: ThemeMode, onChange?: () => void) {
   const mediaQuery = window.matchMedia(THEME_MEDIA_QUERY);
   const listener = () => {
+    // 只有“跟随系统”模式需要响应系统主题变化，固定主题时直接忽略。
     if (document.documentElement.dataset.themePreference === 'system') {
       applyThemeMode(themeMode);
       onChange?.();

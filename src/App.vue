@@ -23,6 +23,7 @@ async function loadConfig() {
 onMounted(() => {
   loadConfig();
 
+  // popup 可能在设置页保存后仍处于打开状态，这里直接监听 storage 变化同步最新配置。
   const handleStorageChanged = (
     changes: Record<string, chrome.storage.StorageChange>,
     areaName: string
