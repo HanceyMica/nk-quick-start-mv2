@@ -57,13 +57,10 @@ function resolveGridAtPath(items: GridItem[], path: number[]): GridItem[] {
   return current;
 }
 
-const currentGrid = computed(() => resolveGridAtPath(popupConfig.value.items, currentPath.value));
-const isSubGrid = computed(() => currentPath.value.length > 0);
-
 const breadcrumbs = computed(() => {
   const paths: string[] = [];
   let current = popupConfig.value.items;
-  for (const idx of currentPath.value) {
+  for (const idx of activePath.value) {
     paths.push(current[idx].label);
     if (current[idx].type === 'grid' && current[idx].grid) {
       current = current[idx].grid;
@@ -71,6 +68,8 @@ const breadcrumbs = computed(() => {
   }
   return paths;
 });
+
+const currentGrid = computed(() => resolveGridAtPath(popupConfig.value.items, activePath.value));
 
 function flattenGrid(items: GridItem[], path: string[] = [], codePath: number[] = []): SearchResultItem[] {
   const result: SearchResultItem[] = [];
@@ -118,6 +117,34 @@ const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase());
 const isCommandQuery = computed(() => normalizedQuery.value.startsWith('/'));
 const commandKeyword = computed(() => normalizedQuery.value.slice(1));
 const hasSearchInput = computed(() => normalizedQuery.value.length > 0);
+const digitQuery = computed(() => /^\d+$/.test(normalizedQuery.value) ? normalizedQuery.value : '');
+
+function resolveGridPathFromCode(items: GridItem[], code: string): number[] | null {
+  if (!code) return null;
+
+  let current = items;
+  const resolvedPath: number[] = [];
+
+  for (const char of code) {
+    const gridIndex = Number(char) - 1;
+    const target = current[gridIndex];
+    if (!target || target.type !== 'grid' || !target.grid) {
+      return null;
+    }
+    resolvedPath.push(gridIndex);
+    current = target.grid;
+  }
+
+  return resolvedPath;
+}
+
+const queryDrivenPath = computed(() =>
+  popupConfig.value.mode === 'simple'
+    ? resolveGridPathFromCode(popupConfig.value.items, digitQuery.value)
+    : null
+);
+
+const activePath = computed(() => queryDrivenPath.value ?? currentPath.value);
 
 function handleItemClick(item: GridItem, index: number) {
   if (item.type === 'url' && item.url) {
@@ -130,12 +157,19 @@ function handleItemClick(item: GridItem, index: number) {
 }
 
 function goBack() {
-  if (currentPath.value.length === 0) return;
+  if (popupConfig.value.mode !== 'simple') return;
 
+  if (queryDrivenPath.value && digitQuery.value) {
+    searchQuery.value = digitQuery.value.slice(0, -1);
+    return;
+  }
+
+  if (currentPath.value.length === 0) return;
   currentPath.value.pop();
 }
 
 function goHome() {
+  searchQuery.value = '';
   currentPath.value = [];
 }
 
@@ -235,7 +269,7 @@ function jumpToUrl(url: string) {
 }
 
 async function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'ArrowLeft' && popupConfig.value.mode === 'simple' && isSubGrid.value && !hasSearchInput.value) {
+  if (e.key === 'ArrowLeft' && popupConfig.value.mode === 'simple' && activePath.value.length > 0) {
     e.preventDefault();
     goBack();
     return;
@@ -276,7 +310,7 @@ async function handleKeydown(e: KeyboardEvent) {
     </div>
 
     <div
-      v-if="popupConfig.mode === 'simple' && isSubGrid && !hasSearchInput"
+      v-if="popupConfig.mode === 'simple' && activePath.length > 0"
       class="mb-3 flex items-center justify-between gap-3"
     >
       <div class="text-muted text-xs">按【方向左】返回上一层级</div>
@@ -290,7 +324,7 @@ async function handleKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- 面包屑导航 -->
-    <div v-if="popupConfig.mode === 'simple' && !searchQuery && isSubGrid" class="mb-4 flex items-center">
+    <div v-if="popupConfig.mode === 'simple' && activePath.length > 0" class="mb-4 flex items-center">
       <button
         @click="goHome"
         class="text-secondary flex items-center gap-1 text-sm transition-colors hover:opacity-80"
@@ -302,7 +336,7 @@ async function handleKeydown(e: KeyboardEvent) {
         <span class="text-muted mx-2">/</span>
         <span class="text-muted text-sm">{{ crumb }}</span>
       </template>
-      <template v-if="currentPath.length > 0">
+      <template v-if="activePath.length > 0">
         <span class="text-muted mx-2">/</span>
         <button @click="goBack" class="text-secondary text-sm hover:opacity-80">
           返回
@@ -347,13 +381,16 @@ async function handleKeydown(e: KeyboardEvent) {
       </button>
     </div>
 
-    <div v-else-if="hasSearchInput" class="text-muted px-1 text-sm">
+    <div
+      v-else-if="hasSearchInput && !(popupConfig.mode === 'simple' && queryDrivenPath)"
+      class="text-muted px-1 text-sm"
+    >
       未找到匹配项。可继续输入网址名称 / 编号，或试试 `/D` `/L` `/W` `/S` `/A`。
     </div>
 
     <!-- 九宫格 -->
     <div
-      v-if="popupConfig.mode === 'simple' && !hasSearchInput"
+      v-if="popupConfig.mode === 'simple' && (!hasSearchInput || queryDrivenPath)"
       class="flex-1 flex items-center justify-center"
     >
       <GridView
