@@ -1,17 +1,2 @@
-function openExpertModePage() {
-  chrome.tabs.create({ url: chrome.runtime.getURL('expert.html') });
-}
-
-// 后台脚本处理快捷键，直接打开专家模式页面。
-chrome.commands.onCommand.addListener((command: string) => {
-  if (command === 'toggle-expert-mode') {
-    openExpertModePage();
-  }
-});
-
-// 兼容其他页面主动请求打开专家模式。
-chrome.runtime.onMessage.addListener((message: { action: string }) => {
-  if (message.action === 'openExpertMode') {
-    openExpertModePage();
-  }
-});
+// 快捷键改为使用 manifest 中的 _execute_action 直接弹出 popup。
+// 该文件暂时保留，避免后续需要恢复后台逻辑时重新创建入口。

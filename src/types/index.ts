@@ -6,10 +6,13 @@ export interface GridItem {
   grid?: GridItem[];
 }
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export interface Config {
   version: number;
   mode: 'simple' | 'expert';
   expertShortcut: string;
+  themeMode: ThemeMode;
   items: GridItem[];
 }
 
@@ -40,9 +43,10 @@ export function createDefaultConfig(): Config {
   ];
 
   return {
-    version: 1,
+    version: 2,
     mode: 'simple',
     expertShortcut: 'Alt+9',
+    themeMode: 'system',
     items: defaultUrls.map((item) => ({
       id: generateId(),
       label: item.label,

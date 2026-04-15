@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import PopupView from './components/PopupView.vue';
-import { ensureConfig } from './utils/config';
+import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
 
 const config = ref<Config>(createDefaultConfig());
 const loading = ref(true);
+let stopWatchingSystemTheme: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -21,13 +22,23 @@ async function loadConfig() {
 onMounted(() => {
   loadConfig();
 });
+
+watch(
+  () => config.value.themeMode,
+  (themeMode) => {
+    applyThemeMode(themeMode);
+    stopWatchingSystemTheme?.();
+    stopWatchingSystemTheme = watchSystemTheme(themeMode);
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <div class="h-screen w-screen overflow-hidden">
+  <div class="popup-root page-shell overflow-hidden">
     <PopupView v-if="!loading" :config="config" />
-    <div v-else class="flex items-center justify-center h-screen">
-      <div class="i-carbon-circle-dash text-4xl text-white animate-spin"></div>
+    <div v-else class="popup-shell flex items-center justify-center">
+      <div class="text-muted i-carbon-circle-dash animate-spin text-4xl"></div>
     </div>
   </div>
 </template>

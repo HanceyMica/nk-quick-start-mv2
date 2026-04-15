@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import type { Config, GridItem } from './types';
-import { ensureConfig } from './utils/config';
+import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
 
 const config = ref<Config | null>(null);
 const searchQuery = ref('');
 const matchedItems = ref<Array<{ item: GridItem; path: string[]; index: number }>>([]);
 const inputRef = ref<HTMLInputElement | null>(null);
+let stopWatchingSystemTheme: (() => void) | undefined;
 
 interface MatchedItem {
   item: GridItem;
@@ -87,10 +88,21 @@ onMounted(() => {
   loadConfig();
   inputRef.value?.focus();
 });
+
+watch(
+  () => config.value?.themeMode,
+  (themeMode) => {
+    if (!themeMode) return;
+    applyThemeMode(themeMode);
+    stopWatchingSystemTheme?.();
+    stopWatchingSystemTheme = watchSystemTheme(themeMode);
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-4">
+  <div class="page-shell flex items-center justify-center p-4">
     <div class="w-full max-w-md">
       <!-- 搜索框 -->
       <div class="mb-6">
@@ -101,7 +113,7 @@ onMounted(() => {
           @keydown="handleKeydown"
           type="text"
           placeholder="输入编号(1-9)或名称(可模糊)后回车跳转"
-          class="w-full px-5 py-4 text-lg bg-white/95 backdrop-blur rounded-xl shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-300"
+          class="form-input px-5 py-4 text-lg shadow-lg"
         />
       </div>
 
@@ -111,25 +123,25 @@ onMounted(() => {
           v-for="(match, idx) in matchedItems"
           :key="idx"
           @click="jumpToUrl(match.item.url || '')"
-          class="flex items-center gap-4 p-4 bg-white/90 hover:bg-white rounded-xl shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl"
+          class="search-result flex cursor-pointer items-center gap-4 p-4 transition-all duration-200"
         >
-          <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold rounded-lg">
+          <div class="badge h-10 w-10 font-bold">
             {{ match.index }}
           </div>
           <div class="flex-1">
-            <div class="font-medium text-gray-800">{{ match.item.label }}</div>
-            <div class="text-xs text-gray-500">{{ match.path.join(' > ') }}</div>
+            <div class="text-theme font-medium">{{ match.item.label }}</div>
+            <div class="text-muted text-xs">{{ match.path.join(' > ') }}</div>
           </div>
         </div>
       </div>
 
       <!-- 提示 -->
-      <div v-else-if="searchQuery" class="text-center text-white/70">
+      <div v-else-if="searchQuery" class="text-muted text-center">
         未找到匹配的网址
       </div>
 
       <!-- 使用说明 -->
-      <div v-else class="text-center text-white/60 text-sm">
+      <div v-else class="text-muted text-center text-sm">
         <p>输入编号或名称快速跳转</p>
         <p class="mt-2">按 ESC 关闭</p>
       </div>

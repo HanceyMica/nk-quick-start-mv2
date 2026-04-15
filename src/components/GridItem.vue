@@ -28,11 +28,11 @@ function handleError() {
 
 <template>
   <div
-    class="flex flex-col items-center justify-center h-20 bg-white/90 hover:bg-white rounded-xl shadow-md hover:shadow-xl cursor-pointer transition-all duration-200 hover:-translate-y-1"
-    :class="{ 'ring-2 ring-purple-400': isGridType }"
+    class="tile-card flex h-20 cursor-pointer flex-col items-center justify-center transition-all duration-200 hover:-translate-y-1"
+    :class="{ 'tile-card-grid': isGridType }"
   >
     <!-- 套娃图标 -->
-    <div v-if="isGridType" class="i-carbon-data-blob text-3xl text-purple-500 mb-1"></div>
+    <div v-if="isGridType" class="text-secondary i-carbon-data-blob mb-1 text-3xl"></div>
 
     <!-- Favicon -->
     <img
@@ -45,13 +45,13 @@ function handleError() {
     <!-- 默认数字图标 -->
     <div
       v-else
-      class="w-6 h-6 flex items-center justify-center text-lg font-bold text-gray-600 mb-1"
+      class="text-secondary mb-1 flex h-6 w-6 items-center justify-center text-lg font-bold"
     >
       {{ index + 1 }}
     </div>
 
     <!-- 标签 -->
-    <span class="text-xs text-gray-700 text-center max-w-full truncate px-1">
+    <span class="text-theme max-w-full truncate px-1 text-center text-xs">
       {{ item.label || `网站${index + 1}` }}
     </span>
   </div>

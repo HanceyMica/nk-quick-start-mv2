@@ -8,10 +8,6 @@
     "default_title": "九宫格网址跳转"
   },
   "options_page": "options.html",
-  "background": {
-    "service_worker": "src/background.ts",
-    "type": "module"
-  },
   "permissions": [
     "storage"
   ],
@@ -19,12 +15,11 @@
     "<all_urls>"
   ],
   "commands": {
-    "toggle-expert-mode": {
+    "_execute_action": {
       "suggested_key": {
         "default": "Alt+9",
         "mac": "Command+9"
-      },
-      "description": "切换专家模式"
+      }
     }
   },
   "icons": {
