@@ -155,7 +155,7 @@ function importConfig() {
 
     <div class="panel space-y-3 p-6">
       <div>
-        <h2 class="text-theme text-xl font-semibold">专家模式快捷键</h2>
+        <h2 class="text-theme text-xl font-semibold">快捷键</h2>
         <p class="text-muted mt-1 text-sm">系统级快捷键由 Chrome 管理，扩展内不能直接改写。</p>
       </div>
       <div class="surface-soft rounded-xl p-4">

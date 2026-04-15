@@ -62,7 +62,7 @@ export function createDefaultConfig(): Config {
   return {
     version: 3,
     mode: 'simple',
-    expertShortcut: 'Alt+9',
+    expertShortcut: 'Alt+1',
     themeMode: 'system',
     items: defaultUrls.map((item) => ({
       id: generateId(),

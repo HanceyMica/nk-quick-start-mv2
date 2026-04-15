@@ -41,7 +41,7 @@ onMounted(async () => {
           <ul class="list-disc list-inside space-y-1 text-sm">
             <li>点击九宫格中的图标访问对应网址</li>
             <li>点击"设置"按钮自定义网址</li>
-            <li>按 Alt+9 打开专家模式</li>
+            <li>按 Alt+1 打开扩展弹窗</li>
             <li>输入编号或名称快速跳转</li>
           </ul>
         </div>
