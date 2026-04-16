@@ -252,12 +252,28 @@ const matchedCommands = computed(() => {
 const matchedItems = computed(() => {
   if (isCommandQuery.value || !normalizedQuery.value) return [];
   if (popupConfig.value.mode === 'simple' && queryDrivenPath.value) return [];
-  return allItems.value.filter(match => {
-    if (match.code.toLowerCase() === normalizedQuery.value) {
-      return true;
-    }
-    return match.label.toLowerCase().includes(normalizedQuery.value);
-  }).slice(0, 9);
+  return allItems.value
+    .filter(match => {
+      if (match.code.toLowerCase() === normalizedQuery.value) {
+        return true;
+      }
+      return match.label.toLowerCase().includes(normalizedQuery.value);
+    })
+    .sort((a, b) => {
+      const aExactCode = a.code.toLowerCase() === normalizedQuery.value ? 1 : 0;
+      const bExactCode = b.code.toLowerCase() === normalizedQuery.value ? 1 : 0;
+      if (aExactCode !== bExactCode) {
+        return bExactCode - aExactCode;
+      }
+
+      // 同等匹配级别下优先展示更浅层、更短的编号，避免子网格名称匹配抢在主格结果前面。
+      if (a.code.length !== b.code.length) {
+        return a.code.length - b.code.length;
+      }
+
+      return a.code.localeCompare(b.code, 'zh-CN');
+    })
+    .slice(0, 9);
 });
 
 async function executeCommand(command: PopupCommand) {
