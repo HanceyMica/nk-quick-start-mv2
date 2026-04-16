@@ -1,19 +1,33 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
+import { onMounted, onUnmounted } from 'vue';
+import { applyThemeMode, ensureConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 let stopWatchingSystemTheme: (() => void) | undefined;
+let removeConfigListener: (() => void) | undefined;
+
+function applyConfigTheme(themeMode: 'light' | 'dark' | 'system') {
+  applyThemeMode(themeMode);
+  stopWatchingSystemTheme?.();
+  stopWatchingSystemTheme = watchSystemTheme(themeMode);
+}
 
 onMounted(async () => {
   try {
     const config = await ensureConfig();
-    applyThemeMode(config.themeMode);
-    stopWatchingSystemTheme?.();
-    stopWatchingSystemTheme = watchSystemTheme(config.themeMode);
+    applyConfigTheme(config.themeMode);
   } catch (e) {
     console.error('加载主题配置失败:', e);
     applyThemeMode('light');
   }
+
+  removeConfigListener = subscribeConfigChanges((config) => {
+    applyConfigTheme(config.themeMode);
+  });
+});
+
+onUnmounted(() => {
+  removeConfigListener?.();
+  stopWatchingSystemTheme?.();
 });
 </script>
 

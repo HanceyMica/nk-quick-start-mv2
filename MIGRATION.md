@@ -22,7 +22,7 @@
 | `src/options.ts` | 设置页 Vue 应用入口 |
 | `src/about.ts` | 关于页 Vue 应用入口 |
 | `src/expert.ts` | 专家模式页 Vue 应用入口 |
-| `src/App.vue` | popup 根组件，负责读取配置和同步 storage 更新 |
+| `src/App.vue` | popup 根组件，负责读取配置和同步跨页面更新 |
 | `src/OptionsApp.vue` | 设置页根组件，负责加载、保存和 toast 提示 |
 | `src/AboutApp.vue` | 关于页根组件 |
 | `src/ExpertApp.vue` | 专家模式独立搜索页 |
@@ -30,7 +30,7 @@
 | `src/components/GridView.vue` | 九宫格布局 |
 | `src/components/GridItem.vue` | 单个格子展示和 favicon 逻辑 |
 | `src/components/SettingsForm.vue` | 配置编辑、导入导出、重置、主题/模式配置 |
-| `src/utils/config.ts` | `chrome.storage.sync` 读写、配置归一化、主题切换 |
+| `src/utils/config.ts` | IndexedDB 读写、旧配置迁移、页面广播同步、配置归一化、主题切换 |
 | `src/types/index.ts` | 配置结构、默认值、ID 生成与空网格工厂 |
 | `src/background.ts` | 原项目保留的后台入口占位文件 |
 | `public/manifest.json` | MV3 清单 |
@@ -42,18 +42,15 @@
   - 简单模式：九宫格 + 子网格套娃导航。
   - 专家模式：扁平化条目搜索与回车直达。
 - 设置页允许编辑九宫格、子网格、专家模式条目、主题模式，以及导入/导出/重置配置。
-- 所有配置统一保存到 `chrome.storage.sync`。
+- 所有配置统一保存到 IndexedDB。
 - `ensureConfig()` 会在首次安装时生成默认配置，并对旧结构配置进行归一化兼容。
-- popup 和 options 页面都监听 `chrome.storage.onChanged`，保证多页面之间配置实时同步。
+- popup、options、about、expert 页面通过 `BroadcastChannel` + 本页自定义事件同步配置更新。
 - 关于页和专家页为独立页面入口，由 popup 通过 `chrome.tabs.create()` 打开。
 
 ### 1.4 扩展 API 使用情况
 
 本项目源码中实际使用到的扩展 API 很少，主要为：
 
-- `chrome.storage.sync.get`
-- `chrome.storage.sync.set`
-- `chrome.storage.onChanged.addListener`
 - `chrome.tabs.create`
 - `chrome.runtime.getURL`
 
@@ -117,6 +114,7 @@
 ```
 
 - `host_permissions` 删除，并将 `<all_urls>` 合并进 `permissions`。
+- 保留 `storage` 权限，仅用于首次启动时读取旧版 `chrome.storage.sync` 配置并迁移到 IndexedDB。
 - 命令键名从 `_execute_action` 改为 `_execute_browser_action`。
 - `description` 末尾追加 ` (Manifest V2 port)`。
 - 版本号保持与原项目一致，为 `2.0.0`。
@@ -142,7 +140,15 @@
 - `src/about.html`
 - `src/expert.html`
 
-以上文件内容保持与原项目一致，未改动业务逻辑、UI 交互、配置结构、搜索行为、主题逻辑、导入导出逻辑与导航规则。
+其中以下文件已为 IndexedDB 与页面广播同步做兼容改造：
+
+- `src/utils/config.ts`
+- `src/App.vue`
+- `src/OptionsApp.vue`
+- `src/ExpertApp.vue`
+- `src/AboutApp.vue`
+
+其余文件内容保持与原项目一致，未改动业务逻辑、UI 交互、配置结构、搜索行为、导入导出逻辑与导航规则。
 
 ## 4. 功能一致性说明
 
@@ -151,9 +157,10 @@
 - popup、options、about、expert 四个页面入口与相对路径保持一致。
 - Vue 组件结构与样式体系保持一致。
 - 九宫格导航、子网格导航、专家模式搜索、主题切换、配置导入/导出/重置全部保持不变。
-- 配置仍由 `chrome.storage.sync` 保存。
+- 配置改为由 IndexedDB 保存。
 - 页面跳转仍由 `chrome.tabs.create()` 完成。
 - `chrome.runtime.getURL('options.html')` / `chrome.runtime.getURL('about.html')` 的使用方式保持不变。
+- 页面间配置同步改为 `BroadcastChannel` + 本页自定义事件，替代 `chrome.storage.onChanged`。
 
 ### 4.2 不存在但已核对的项
 
@@ -183,6 +190,7 @@ npm run build
 - `dist/manifest.json` 已输出为 Manifest V2。
 - `dist/background.js` 已生成。
 - `dist/about.html` 与 `dist/expert.html` 已整理到根目录。
+- 配置主存储已切换到 IndexedDB，并保留对旧版 `chrome.storage.sync` 配置的一次性迁移逻辑。
 
 ### 5.3 构建产物核对
 
@@ -221,7 +229,8 @@ npm run build
 - 已确认 MV2 manifest 结构正确。
 - 已确认 `background.js` 被生成。
 - 已确认 popup/options/about/expert 页面产物存在。
-- 已确认所有业务源码保持不变，未引入新的扩展 API。
+- 已确认配置主存储改为 IndexedDB，旧版 `chrome.storage.sync` 仅作为首次迁移来源。
+- 已确认页面间同步改为 `BroadcastChannel` + 本页事件广播。
 
 #### 自动化浏览器尝试
 
@@ -238,7 +247,7 @@ npm run build
 - Chrome 90+ 加载已解压扩展后的点击图标弹窗验证
 - Chrome 90+ 后台生命周期验证
 - Firefox 102+ 加载与兼容性验证
-- 扩展上下文中的 `chrome.storage.sync` 实际读写验证
+- 扩展上下文中的 IndexedDB 实际读写验证
 - 内容脚本、消息通信、跨域请求验证
 
 说明：这些项在源项目中本身也未实现或未涉及，但由于无法真实加载扩展，无法形成“浏览器运行时证据”。

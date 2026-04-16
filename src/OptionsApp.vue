@@ -3,14 +3,14 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import SettingsForm from './components/SettingsForm.vue';
-import { applyThemeMode, ensureConfig, saveConfig, watchSystemTheme } from './utils/config';
+import { applyThemeMode, ensureConfig, saveConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 const config = ref<Config>(createDefaultConfig());
 const loading = ref(true);
 const showToast = ref(false);
 const toastMessage = ref('');
 let stopWatchingSystemTheme: (() => void) | undefined;
-let removeStorageListener: (() => void) | undefined;
+let removeConfigListener: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -45,22 +45,14 @@ function showToastMessage(message: string, _success = true) {
 onMounted(() => {
   loadConfig();
 
-  // 配置页和 popup 共用同一份 sync 配置，其他页面保存后这里也要实时刷新。
-  const handleStorageChanged = (
-    changes: Record<string, chrome.storage.StorageChange>,
-    areaName: string
-  ) => {
-    if (areaName === 'sync' && changes.config?.newValue) {
-      config.value = changes.config.newValue as Config;
-    }
-  };
-
-  chrome.storage.onChanged.addListener(handleStorageChanged);
-  removeStorageListener = () => chrome.storage.onChanged.removeListener(handleStorageChanged);
+  // 配置页和 popup 共用同一份 IndexedDB 配置，保存后通过广播实时刷新。
+  removeConfigListener = subscribeConfigChanges((newConfig) => {
+    config.value = newConfig;
+  });
 });
 
 onUnmounted(() => {
-  removeStorageListener?.();
+  removeConfigListener?.();
 });
 
 watch(
