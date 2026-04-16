@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { Config, ExpertItem, GridItem, ThemeMode } from '../types';
 import GridView from './GridView.vue';
 import { applyThemeMode, saveConfig } from '../utils/config';
@@ -42,6 +42,11 @@ watch(() => props.config, (newConfig) => {
 
 onMounted(() => {
   inputRef.value?.focus();
+  window.addEventListener('keydown', handleGlobalKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 
 function resolveGridAtPath(items: GridItem[], path: number[]): GridItem[] {
@@ -246,6 +251,7 @@ const matchedCommands = computed(() => {
 
 const matchedItems = computed(() => {
   if (isCommandQuery.value || !normalizedQuery.value) return [];
+  if (popupConfig.value.mode === 'simple' && queryDrivenPath.value) return [];
   return allItems.value.filter(match => {
     if (match.code.toLowerCase() === normalizedQuery.value) {
       return true;
@@ -268,13 +274,14 @@ function jumpToUrl(url: string) {
   window.close();
 }
 
-async function handleKeydown(e: KeyboardEvent) {
+function handleGlobalKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowLeft' && popupConfig.value.mode === 'simple' && activePath.value.length > 0) {
     e.preventDefault();
     goBack();
-    return;
   }
+}
 
+async function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') {
     if (isCommandQuery.value && matchedCommands.value.length > 0) {
       await executeCommand(matchedCommands.value[0]);

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { Config, ExpertItem } from './types';
-import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
+import { applyThemeMode, ensureConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 const config = ref<Config | null>(null);
 const searchQuery = ref('');
 const matchedItems = ref<ExpertItem[]>([]);
 const inputRef = ref<HTMLInputElement | null>(null);
 let stopWatchingSystemTheme: (() => void) | undefined;
+let removeConfigListener: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -56,6 +57,14 @@ function handleKeydown(e: KeyboardEvent) {
 onMounted(() => {
   loadConfig();
   inputRef.value?.focus();
+  removeConfigListener = subscribeConfigChanges((newConfig) => {
+    config.value = newConfig;
+    search();
+  });
+});
+
+onUnmounted(() => {
+  removeConfigListener?.();
 });
 
 watch(

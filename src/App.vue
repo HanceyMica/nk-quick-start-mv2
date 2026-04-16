@@ -3,12 +3,12 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import PopupView from './components/PopupView.vue';
-import { applyThemeMode, ensureConfig, watchSystemTheme } from './utils/config';
+import { applyThemeMode, ensureConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 const config = ref<Config>(createDefaultConfig());
 const loading = ref(true);
 let stopWatchingSystemTheme: (() => void) | undefined;
-let removeStorageListener: (() => void) | undefined;
+let removeConfigListener: (() => void) | undefined;
 
 async function loadConfig() {
   try {
@@ -23,22 +23,14 @@ async function loadConfig() {
 onMounted(() => {
   loadConfig();
 
-  // popup 可能在设置页保存后仍处于打开状态，这里直接监听 storage 变化同步最新配置。
-  const handleStorageChanged = (
-    changes: Record<string, chrome.storage.StorageChange>,
-    areaName: string
-  ) => {
-    if (areaName === 'sync' && changes.config?.newValue) {
-      config.value = changes.config.newValue as Config;
-    }
-  };
-
-  chrome.storage.onChanged.addListener(handleStorageChanged);
-  removeStorageListener = () => chrome.storage.onChanged.removeListener(handleStorageChanged);
+  // popup 可能在设置页保存后仍处于打开状态，这里监听配置广播同步最新值。
+  removeConfigListener = subscribeConfigChanges((newConfig) => {
+    config.value = newConfig;
+  });
 });
 
 onUnmounted(() => {
-  removeStorageListener?.();
+  removeConfigListener?.();
 });
 
 watch(
