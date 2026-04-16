@@ -9,7 +9,7 @@
 - 点击扩展弹窗，直接在九宫格中打开常用站点
 - 支持把某个格子切换成子网格，做二级导航
 - 支持专家模式，使用扁平化网址列表按自定义编号或名称快速跳转
-- 所有配置保存在 `chrome.storage.sync` 中，可跨设备同步
+- 所有配置保存在 IndexedDB 中，并在已打开的扩展页面之间实时同步
 
 ## 核心功能
 
@@ -24,7 +24,8 @@
 ## 项目特性
 
 - 扩展弹窗、设置页、关于页和专家模式页各自独立，职责清晰
-- 使用 `chrome.storage.sync` 保存配置，便于在不同设备间同步
+- 使用 IndexedDB 保存配置，避免受扩展存储 API 兼容性差异影响
+- 通过 `BroadcastChannel` + 页面内事件同步 popup、设置页、关于页和专家页的配置变化
 - 简单模式支持二级子网格，兼顾常用网址与分类导航
 - 专家模式使用独立扁平列表存储，不受九宫格数量限制
 - 支持浅色、深色和跟随系统三种主题模式
@@ -38,6 +39,8 @@
 - CRXJS
 - UnoCSS
 - Chrome Extension Manifest V3
+- IndexedDB
+- BroadcastChannel
 
 ## 安装与运行步骤
 
@@ -99,6 +102,7 @@ npm run build
 - 检查子网格进入、左方向键返回与 `←返回` 按钮
 - 检查专家模式下扁平网址列表搜索是否正常
 - 检查配置保存、导入、导出和重置
+- 检查设置页保存后 popup、关于页和专家页是否能同步更新配置或主题
 - 检查 `Alt+1` 或 `Command+1` 是否能直接弹出扩展 popup
 
 ## 目录结构
@@ -110,7 +114,7 @@ npm run build
 |   |-- components/         弹窗与配置页核心组件
 |   |-- styles/             全局样式
 |   |-- types/              类型定义与默认配置
-|   |-- utils/              配置读写公共逻辑
+|   |-- utils/              IndexedDB 配置读写、旧配置迁移与广播同步
 |   |-- App.vue             popup 入口
 |   |-- OptionsApp.vue      配置页入口
 |   |-- ExpertApp.vue       独立专家模式搜索页
@@ -129,8 +133,16 @@ npm run build
 
 1. 新功能优先保持单一职责，避免一把梭把逻辑塞进组件
 2. 修改配置结构时同步更新类型定义、默认配置和 `normalizeConfig()` 兼容逻辑
-3. 提交前至少执行 `npm run typecheck` 和 `npm run build`
-4. 保持界面文案简洁，别把扩展写成产品经理周报
+3. 修改存储层时同步检查 IndexedDB 迁移、页面广播同步和旧配置兼容路径
+4. 提交前至少执行 `npm run typecheck` 和 `npm run build`
+5. 保持界面文案简洁，别把扩展写成产品经理周报
+
+## 存储与同步
+
+- 主存储使用 IndexedDB，配置入口统一收敛在 `src/utils/config.ts`
+- 首次读取时会尝试从旧版 `chrome.storage.sync` 迁移已有配置到 IndexedDB
+- 配置保存后会通过 `BroadcastChannel` 和当前页面事件广播更新，保证多个扩展页面同步刷新
+- popup 简单模式下，输入纯数字且命中套娃格子时，会优先直接进入对应子网格
 
 ## 许可证
 
