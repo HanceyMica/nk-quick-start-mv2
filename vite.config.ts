@@ -1,8 +1,6 @@
 import { defineConfig, Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import unocss from 'unocss/vite';
-import { crx } from '@crxjs/vite-plugin';
-import manifest from './public/manifest.json';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -36,10 +34,6 @@ export default defineConfig({
   plugins: [
     vue(),
     unocss(),
-    crx({
-      manifest,
-      browser: 'chrome'
-    }),
     cleanupPlugin()
   ],
   build: {
@@ -49,10 +43,11 @@ export default defineConfig({
         popup: 'index.html',
         options: 'options.html',
         expert: 'src/expert.html',
-        about: 'src/about.html'
+        about: 'src/about.html',
+        background: 'src/background.ts'
       },
       output: {
-        entryFileNames: 'assets/[name].js',
+        entryFileNames: (chunkInfo) => chunkInfo.name === 'background' ? 'background.js' : 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]'
       }

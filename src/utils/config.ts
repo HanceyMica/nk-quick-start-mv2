@@ -7,6 +7,38 @@ interface StorageResult {
 
 const THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)';
 
+function getRuntimeError(): Error | undefined {
+  const runtimeError = chrome.runtime?.lastError;
+  if (!runtimeError) return undefined;
+  return runtimeError instanceof Error ? runtimeError : new Error(runtimeError.message);
+}
+
+function storageGet<T>(keys: string | string[] | Record<string, unknown>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(keys, (result) => {
+      const error = getRuntimeError();
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(result as T);
+    });
+  });
+}
+
+function storageSet(items: Record<string, unknown>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.set(items, () => {
+      const error = getRuntimeError();
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === 'light' || value === 'dark' || value === 'system';
 }
@@ -57,24 +89,24 @@ function normalizeConfig(config: Config): Config {
 }
 
 export async function ensureConfig(): Promise<Config> {
-  const result = await chrome.storage.sync.get(['config']) as StorageResult;
+  const result = await storageGet<StorageResult>(['config']);
   if (result.config) {
     const normalizedConfig = normalizeConfig(result.config);
     // 如果读到的是旧结构或缺省字段，顺手回写一次，后续页面都走统一结构。
     if (JSON.stringify(normalizedConfig) !== JSON.stringify(result.config)) {
-      await chrome.storage.sync.set({ config: normalizedConfig });
+      await storageSet({ config: normalizedConfig });
     }
     return normalizedConfig;
   }
 
   // 首次安装时补一份默认配置，保证所有入口行为一致。
   const defaultConfig = createDefaultConfig();
-  await chrome.storage.sync.set({ config: defaultConfig });
+  await storageSet({ config: defaultConfig });
   return defaultConfig;
 }
 
 export async function saveConfig(config: Config): Promise<void> {
-  await chrome.storage.sync.set({ config: normalizeConfig(config) });
+  await storageSet({ config: normalizeConfig(config) });
 }
 
 function resolveThemeMode(themeMode: ThemeMode): 'light' | 'dark' {
@@ -101,6 +133,11 @@ export function watchSystemTheme(themeMode: ThemeMode, onChange?: () => void) {
     }
   };
 
-  mediaQuery.addEventListener('change', listener);
-  return () => mediaQuery.removeEventListener('change', listener);
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }
+
+  mediaQuery.addListener(listener);
+  return () => mediaQuery.removeListener(listener);
 }

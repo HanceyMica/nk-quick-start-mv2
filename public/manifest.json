@@ -1,21 +1,24 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "九宫格网址跳转",
   "version": "2.0.0",
-  "description": "支持网格套娃和专家模式的九宫格网址快速跳转扩展",
-  "action": {
+  "description": "支持网格套娃和专家模式的九宫格网址快速跳转扩展 (Manifest V2 port)",
+  "browser_action": {
     "default_popup": "index.html",
     "default_title": "九宫格网址跳转"
   },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
   "options_page": "options.html",
   "permissions": [
-    "storage"
-  ],
-  "host_permissions": [
+    "storage",
     "<all_urls>"
   ],
   "commands": {
-    "_execute_action": {
+    "_execute_browser_action": {
       "suggested_key": {
         "default": "Alt+1",
         "mac": "Command+1"
