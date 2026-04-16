@@ -13,13 +13,29 @@ export interface ExpertItem {
   url: string;
 }
 
+export interface SearchEngine {
+  id: string;
+  prefix: string;
+  name: string;
+  url: string; // contains %s
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+export interface ThemeCustomCss {
+  brandColor?: string;
+  borderRadius?: string;
+  opacity?: string;
+}
 
 export interface Config {
   version: number;
   mode: 'simple' | 'expert';
   expertShortcut: string;
   themeMode: ThemeMode;
+  customCss?: ThemeCustomCss;
+  searchEngines: SearchEngine[];
+  defaultSearchEngineId?: string;
   items: GridItem[];
   expertItems: ExpertItem[];
 }
@@ -59,11 +75,20 @@ export function createDefaultConfig(): Config {
     { label: '网易', url: 'https://www.163.com' }
   ];
 
+  const defaultSearchEngines: SearchEngine[] = [
+    { id: generateId(), prefix: 'g', name: 'Google', url: 'https://www.google.com/search?q=%s' },
+    { id: generateId(), prefix: 'bd', name: 'Baidu', url: 'https://www.baidu.com/s?wd=%s' },
+    { id: generateId(), prefix: 'b', name: 'Bing', url: 'https://www.bing.com/search?q=%s' }
+  ];
+
   return {
     version: 3,
     mode: 'simple',
     expertShortcut: 'Alt+1',
     themeMode: 'system',
+    customCss: {},
+    searchEngines: defaultSearchEngines,
+    defaultSearchEngineId: defaultSearchEngines[0].id,
     items: defaultUrls.map((item) => ({
       id: generateId(),
       label: item.label,

@@ -179,6 +179,9 @@ function normalizeConfig(config: Config): Config {
     ...defaults,
     ...config,
     themeMode: isThemeMode(config.themeMode) ? config.themeMode : defaults.themeMode,
+    customCss: config.customCss || defaults.customCss,
+    searchEngines: config.searchEngines?.length ? config.searchEngines : defaults.searchEngines,
+    defaultSearchEngineId: config.defaultSearchEngineId || defaults.defaultSearchEngineId,
     items: config.items?.length ? config.items : defaults.items,
     expertItems: normalizedExpertItems.length ? normalizedExpertItems : defaults.expertItems
   };
@@ -258,6 +261,23 @@ export function applyThemeMode(themeMode: ThemeMode) {
   const resolvedMode = resolveThemeMode(themeMode);
   root.dataset.theme = resolvedMode;
   root.dataset.themePreference = themeMode;
+}
+
+export function applyCustomCss(customCss?: Config['customCss']) {
+  const root = document.documentElement;
+  if (customCss?.brandColor) {
+    root.style.setProperty('--c-theme', customCss.brandColor);
+    root.style.setProperty('--c-theme-hover', customCss.brandColor + 'cc');
+  } else {
+    root.style.removeProperty('--c-theme');
+    root.style.removeProperty('--c-theme-hover');
+  }
+  
+  if (customCss?.borderRadius) {
+    root.style.setProperty('--radius-base', customCss.borderRadius);
+  } else {
+    root.style.removeProperty('--radius-base');
+  }
 }
 
 export function watchSystemTheme(themeMode: ThemeMode, onChange?: () => void) {

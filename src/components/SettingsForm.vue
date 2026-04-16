@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { Config, ThemeMode } from '../types';
-import { createDefaultConfig, createDefaultExpertItem, createEmptyGrid } from '../types';
+import type { Config, ThemeMode, SearchEngine } from '../types';
+import { createDefaultConfig, createDefaultExpertItem, createEmptyGrid, generateId } from '../types';
 
 const props = defineProps<{
   config: Config;
@@ -80,6 +80,42 @@ function addExpertItem() {
 
 function removeExpertItem(index: number) {
   localConfig.value.expertItems.splice(index, 1);
+}
+
+function updateSearchEngine(index: number, field: keyof SearchEngine, value: string) {
+  (localConfig.value.searchEngines[index] as any)[field] = value;
+}
+
+function addSearchEngine() {
+  localConfig.value.searchEngines.push({
+    id: generateId(),
+    prefix: '',
+    name: '新引擎',
+    url: ''
+  });
+}
+
+function removeSearchEngine(index: number) {
+  const engine = localConfig.value.searchEngines[index];
+  localConfig.value.searchEngines.splice(index, 1);
+  if (localConfig.value.defaultSearchEngineId === engine.id && localConfig.value.searchEngines.length > 0) {
+    localConfig.value.defaultSearchEngineId = localConfig.value.searchEngines[0].id;
+  }
+}
+
+function setDefaultSearchEngine(id: string) {
+  localConfig.value.defaultSearchEngineId = id;
+}
+
+function updateCustomCss(field: 'brandColor' | 'borderRadius' | 'opacity', value: string) {
+  if (!localConfig.value.customCss) {
+    localConfig.value.customCss = {};
+  }
+  // Deep clone customCss to ensure Vue reactivity triggers watch
+  localConfig.value.customCss = {
+    ...localConfig.value.customCss,
+    [field]: value
+  };
 }
 
 function save() {
@@ -250,6 +286,103 @@ function importConfig() {
           <span class="text-sm font-semibold">{{ option.label }}</span>
           <span class="text-muted mt-1 text-xs">{{ option.description }}</span>
         </button>
+      </div>
+
+      <!-- CSS Variables -->
+      <div class="mt-6 border-t border-gray-200 dark:border-gray-800 pt-6">
+        <h3 class="text-theme text-lg font-semibold mb-3">自定义样式</h3>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-secondary mb-1">品牌色 (如: #10b981)</label>
+            <input 
+              type="text" 
+              :value="localConfig.customCss?.brandColor || ''"
+              @input="updateCustomCss('brandColor', ($event.target as HTMLInputElement).value)"
+              placeholder="#10b981"
+              class="form-input"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-secondary mb-1">圆角大小 (如: 0.5rem)</label>
+            <input 
+              type="text" 
+              :value="localConfig.customCss?.borderRadius || ''"
+              @input="updateCustomCss('borderRadius', ($event.target as HTMLInputElement).value)"
+              placeholder="0.5rem"
+              class="form-input"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜索引擎配置 -->
+    <div class="panel space-y-4 p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-theme text-xl font-semibold">搜索引擎</h2>
+          <p class="text-muted mt-1 text-sm">专家模式下通过输入 "前缀 + 空格 + 搜索词" 进行快速搜索，默认引擎支持直接输入搜索词。</p>
+        </div>
+        <button
+          type="button"
+          class="secondary-button px-4 py-2 text-sm shrink-0"
+          @click="addSearchEngine"
+        >
+          新增引擎
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div
+          v-for="(engine, index) in localConfig.searchEngines"
+          :key="engine.id"
+          class="surface-soft rounded-xl p-4 flex flex-col gap-3"
+          :class="{ 'border border-theme': localConfig.defaultSearchEngineId === engine.id }"
+        >
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                name="defaultSearchEngine" 
+                :checked="localConfig.defaultSearchEngineId === engine.id"
+                @change="setDefaultSearchEngine(engine.id)"
+                class="accent-theme"
+              />
+              <span class="text-sm font-medium" :class="localConfig.defaultSearchEngineId === engine.id ? 'text-theme' : 'text-secondary'">设为默认</span>
+            </label>
+            <button
+              type="button"
+              class="text-muted text-sm hover:opacity-75"
+              @click="removeSearchEngine(index)"
+            >
+              删除
+            </button>
+          </div>
+          
+          <div class="grid gap-3 md:grid-cols-[80px_120px_minmax(0,1fr)]">
+            <input
+              type="text"
+              :value="engine.prefix"
+              @input="updateSearchEngine(index, 'prefix', ($event.target as HTMLInputElement).value)"
+              placeholder="前缀(如 g)"
+              class="form-input"
+            />
+            <input
+              type="text"
+              :value="engine.name"
+              @input="updateSearchEngine(index, 'name', ($event.target as HTMLInputElement).value)"
+              placeholder="引擎名称"
+              class="form-input"
+            />
+            <input
+              type="url"
+              :value="engine.url"
+              @input="updateSearchEngine(index, 'url', ($event.target as HTMLInputElement).value)"
+              placeholder="包含 %s 的搜索URL"
+              class="form-input"
+            />
+          </div>
+        </div>
       </div>
     </div>
 

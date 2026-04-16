@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import type { Config } from './types';
 import { createDefaultConfig } from './types';
 import SettingsForm from './components/SettingsForm.vue';
-import { applyThemeMode, ensureConfig, saveConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
+import { applyThemeMode, applyCustomCss, ensureConfig, saveConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 const config = ref<Config>(createDefaultConfig());
 const loading = ref(true);
@@ -63,6 +63,14 @@ watch(
     stopWatchingSystemTheme = watchSystemTheme(themeMode);
   },
   { immediate: true }
+);
+
+watch(
+  () => config.value.customCss,
+  (customCss) => {
+    applyCustomCss(customCss);
+  },
+  { immediate: true, deep: true }
 );
 </script>
 

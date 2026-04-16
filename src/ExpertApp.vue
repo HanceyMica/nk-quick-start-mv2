@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import type { Config, ExpertItem } from './types';
-import { applyThemeMode, ensureConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
+import { applyThemeMode, applyCustomCss, ensureConfig, subscribeConfigChanges, watchSystemTheme } from './utils/config';
 
 const config = ref<Config | null>(null);
 const searchQuery = ref('');
@@ -76,6 +76,14 @@ watch(
     stopWatchingSystemTheme = watchSystemTheme(themeMode);
   },
   { immediate: true }
+);
+
+watch(
+  () => config.value?.customCss,
+  (customCss) => {
+    applyCustomCss(customCss);
+  },
+  { immediate: true, deep: true }
 );
 </script>
 

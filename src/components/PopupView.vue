@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import type { Config, ExpertItem, GridItem, ThemeMode } from '../types';
+import type { Config, ExpertItem, GridItem, ThemeMode, SearchEngine } from '../types';
 import GridView from './GridView.vue';
 import { applyThemeMode, saveConfig } from '../utils/config';
 
@@ -249,6 +249,32 @@ const matchedCommands = computed(() => {
   );
 });
 
+// Handle search engine queries
+const searchEngineMatch = computed<{ engine: SearchEngine; query: string } | null>(() => {
+  if (isCommandQuery.value) return null;
+  const rawQuery = searchQuery.value.trim();
+  if (!rawQuery) return null;
+
+  const parts = rawQuery.split(' ');
+  if (parts.length >= 2) {
+    const prefix = parts[0].toLowerCase();
+    const engine = popupConfig.value.searchEngines.find(e => e.prefix.toLowerCase() === prefix);
+    if (engine) {
+      return { engine, query: parts.slice(1).join(' ') };
+    }
+  }
+
+  // Use default engine if available
+  if (popupConfig.value.defaultSearchEngineId) {
+    const defaultEngine = popupConfig.value.searchEngines.find(e => e.id === popupConfig.value.defaultSearchEngineId);
+    if (defaultEngine) {
+      return { engine: defaultEngine, query: rawQuery };
+    }
+  }
+
+  return null;
+});
+
 const matchedItems = computed(() => {
   if (isCommandQuery.value || !normalizedQuery.value) return [];
   if (popupConfig.value.mode === 'simple' && queryDrivenPath.value) return [];
@@ -305,6 +331,12 @@ async function handleKeydown(e: KeyboardEvent) {
     }
     if (matchedItems.value.length > 0) {
       jumpToUrl(matchedItems.value[0].url || '');
+      return;
+    }
+    if (searchEngineMatch.value) {
+      const { engine, query } = searchEngineMatch.value;
+      jumpToUrl(engine.url.replace('%s', encodeURIComponent(query)));
+      return;
     }
     return;
   }
@@ -400,6 +432,22 @@ async function handleKeydown(e: KeyboardEvent) {
         <div class="min-w-0 flex-1">
           <div class="text-theme truncate text-sm font-medium">{{ match.label }}</div>
           <div class="text-muted truncate text-xs">{{ match.path.join(' > ') }}</div>
+        </div>
+      </button>
+    </div>
+
+    <div v-else-if="searchEngineMatch" class="space-y-2">
+      <button
+        type="button"
+        @click="jumpToUrl(searchEngineMatch.engine.url.replace('%s', encodeURIComponent(searchEngineMatch.query)))"
+        class="search-result flex w-full items-center gap-3 p-3 text-left transition-all duration-200"
+      >
+        <div class="badge h-9 w-9 shrink-0 text-sm font-semibold flex items-center justify-center">
+          <span class="i-carbon-search text-lg"></span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-theme truncate text-sm font-medium">使用 {{ searchEngineMatch.engine.name }} 搜索</div>
+          <div class="text-muted truncate text-xs">{{ searchEngineMatch.query }}</div>
         </div>
       </button>
     </div>
